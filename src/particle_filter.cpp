@@ -12,12 +12,26 @@
 
 #include "particle_filter.h"
 
+using namespace std;
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
-
+	this->num_particles = 100;
+	double init_weight = 1.;
+	default_random_engine gen;
+	normal_distribution<double> dist_x(x, std[0]);
+	normal_distribution<double> dist_y(y, std[1]);
+	normal_distribution<double> dist_theta(theta, std[2]);
+	for(int i=0; i<num_particles; ++i) {
+		Particle p = {i, dist_x(gen), dist_y(gen), dist_theta(gen), init_weight};
+		this->particles.push_back(p);
+		this->weights.push_back(init_weight);
+	}
+	cout << "init" << endl;
+	this->is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -25,6 +39,29 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
+	const double delta_pos = velocity * delta_t; 
+	const double f = velocity / yaw_rate;
+	const double delta_theta = yaw_rate * delta_t;
+	const bool is_moving_straight = fabs(yaw_rate) > 0.001;  
+	default_random_engine gen;
+	normal_distribution<double> dist_x(0., std_pos[0]);
+	normal_distribution<double> dist_y(0., std_pos[1]);
+	normal_distribution<double> dist_theta(0., std_pos[2]);
+
+	for(int i=0; i<particles.size(); ++i) {
+		Particle *p = &particles[i];
+		if(is_moving_straight) {
+			p->x += delta_pos * cos(p->theta) + dist_x(gen);
+			p->y += delta_pos *sind(p->theta) + dist_y(gen);
+			p->theta += dist_theta(gen);
+		} 
+		else {
+			const double phi = p->theta + delta_theta;
+			p->x += f * (sin(phi) - sin(p->theta)) + dist_x(gen); 
+			p->y += f * (cos(p->theta) - cos(phi)) + dist_y(gen);
+			p->theta = phi + dist_theta(gen);
+		}
+	}
 
 }
 
