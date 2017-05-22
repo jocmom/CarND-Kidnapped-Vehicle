@@ -52,7 +52,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		Particle *p = &particles[i];
 		if(is_moving_straight) {
 			p->x += delta_pos * cos(p->theta) + dist_x(gen);
-			p->y += delta_pos *sind(p->theta) + dist_y(gen);
+			p->y += delta_pos * sin(p->theta) + dist_y(gen);
 			p->theta += dist_theta(gen);
 		} 
 		else {
