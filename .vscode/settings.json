@@ -1,0 +1,10 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+    "files.associations": {
+        "ostream": "cpp",
+        "complex": "cpp",
+        "functional": "cpp",
+        "cmath": "cpp",
+        "array": "cpp"
+    }
+}
