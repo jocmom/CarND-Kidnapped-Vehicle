@@ -12,6 +12,7 @@
 
 #include "particle_filter.h"
 #include "helper_functions.h"
+#include "map.h"
 
 using namespace std;
 
@@ -95,14 +96,66 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
 	//   for the fact that the map's y-axis actually points downwards.)
 	//   http://planning.cs.uiuc.edu/node99.html
-	
+
+	double std_x = std_landmark[0];
+	double std_y = std_landmark[1];
+	double std_x_square = 0.5/(std_x*std_x);
+	double std_y_square = 0.5/(std_y*std_y);
+	double d = 2*M_PI*std_x*std_y;
+
+	// Transformation from vehicle to map coordinate system for each particle
+	for(vector<Particle>::iterator itP = particles.begin(); itP != particles.end(); ++itP) {
+		vector<LandmarkObs> valid_landmarks;
+		vector<LandmarkObs> transformed_observations;
+		// translate and rotate observations 
+		for(vector<LandmarkObs>::iterator itO = observations.begin(); itO != observations.end(); itO++) {
+			double x = itP->x + itP->x * cos(itP->theta) - itP->y * sin(itP->theta);
+			double y = itP->y + itP->y * sin(itP->theta) + itP->x * cos(itP->theta);
+			LandmarkObs transformed_observation = {itO->id, x, y};
+			transformed_observations.push_back(transformed_observation);
+		}
+		// select only valid landmarks in sensor range
+		for(vector<Map::single_landmark_s>::iterator itL = map_landmarks.landmark_list.begin(); 
+			itL != map_landmarks.landmark_list.end();
+			++ itL) 
+		{
+			if(dist(itP->x, itP->y, itL->x_f, itL->y_f) <= sensor_range) {
+				LandmarkObs valid_landmark = {itL->id_i, itL->x_f, itL->y_f};
+				valid_landmarks.push_back(valid_landmark);
+			}
+		}
+		// Association
+		this->dataAssociation(valid_landmarks, transformed_observations);
+
+		// calculate particle weights
+		double weight = 1.;
+		for(vector<LandmarkObs>::iterator itO = transformed_observations.begin(); itO != transformed_observations.end(); itO++) {
+			double diff_x = itO->x - valid_landmarks[itO->id].x;
+			double diff_y = itO->y - valid_landmarks[itO->id].y;
+			double diff_x_square = diff_x * diff_x;
+			double diff_y_square = diff_y * diff_y;
+			weight *= exp(-(diff_x_square*std_x_square + diff_y_square*std_y_square )) / d;
+		}
+		itP->weight = weight;
+		this->weights[itP - particles.begin()] = weight;
+	}
 }
 
 void ParticleFilter::resample() {
 	// TODO: Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+	default_random_engine gen;
+	discrete_distribution<int> dist_w(this->weights.begin(), this->weights.end());
+	vector<Particle> updated_particles;
 
+	for(int i=0; i<num_particles; ++i) {
+		int idx = dist_w(gen);
+// TODO use init weight?
+		Particle p = {i, particles[idx].x, particles[idx].y, particles[idx].theta, 1.};
+// TODO this->weights update?
+		updated_particles.push_back(p);
+	}
 }
 
 void ParticleFilter::write(std::string filename) {
