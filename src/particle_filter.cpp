@@ -44,24 +44,24 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	const double delta_pos = velocity * delta_t; 
 	const double f = velocity / yaw_rate;
 	const double delta_theta = yaw_rate * delta_t;
-	const bool is_moving_straight = fabs(yaw_rate) > 0.001;  
+	const bool is_moving_straight = fabs(yaw_rate) < 0.001;  
 	default_random_engine gen;
 	normal_distribution<double> dist_x(0., std_pos[0]);
 	normal_distribution<double> dist_y(0., std_pos[1]);
 	normal_distribution<double> dist_theta(0., std_pos[2]);
 
-	for(int i=0; i<particles.size(); ++i) {
-		Particle *p = &particles[i];
+
+    for(auto it = particles.begin(); it != particles.end(); ++it) {
 		if(is_moving_straight) {
-			p->x += delta_pos * cos(p->theta) + dist_x(gen);
-			p->y += delta_pos * sin(p->theta) + dist_y(gen);
-			p->theta += dist_theta(gen);
+			it->x += delta_pos * cos(it->theta) + dist_x(gen);
+			it->y += delta_pos * sin(it->theta) + dist_y(gen);
+			it->theta += dist_theta(gen);
 		} 
 		else {
-			const double phi = p->theta + delta_theta;
-			p->x += f * (sin(phi) - sin(p->theta)) + dist_x(gen); 
-			p->y += f * (cos(p->theta) - cos(phi)) + dist_y(gen);
-			p->theta = phi + dist_theta(gen);
+			const double phi = it->theta + delta_theta;
+			it->x += f * (sin(phi) - sin(it->theta)) + dist_x(gen); 
+			it->y += f * (cos(it->theta) - cos(phi)) + dist_y(gen);
+			it->theta = phi + dist_theta(gen);
 		}
 	}
 }
@@ -73,13 +73,16 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   implement this method and use it as a helper during the updateWeights phase.
 	for(int i=0; i<observations.size(); ++i) {
 		double closestPrediction = __DBL_MAX__;
+		int closestIndex=0;
 		for(int j=0; j<predicted.size(); ++j) {
 			double distance = dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y);
 			if(distance < closestPrediction) {
 				closestPrediction = distance;
-				observations[i].id = j;
+				//observations[i].id = j;
+				closestIndex = j;
 			}
 		}
+		observations[i].id = closestIndex;
 	}
 }
 
@@ -97,11 +100,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   for the fact that the map's y-axis actually points downwards.)
 	//   http://planning.cs.uiuc.edu/node99.html
 
-	double std_x = std_landmark[0];
-	double std_y = std_landmark[1];
-	double std_x_square = 0.5/(std_x*std_x);
-	double std_y_square = 0.5/(std_y*std_y);
-	double d = 2*M_PI*std_x*std_y;
+	const double std_x = std_landmark[0];
+	const double std_y = std_landmark[1];
+	const double std_x_square = 0.5/(std_x*std_x);
+	const double std_y_square = 0.5/(std_y*std_y);
+	const double d = 2.*M_PI*std_x*std_y;
 
 	// Transformation from vehicle to map coordinate system for each particle
 	for(vector<Particle>::iterator itP = particles.begin(); itP != particles.end(); ++itP) {
@@ -109,8 +112,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		vector<LandmarkObs> transformed_observations;
 		// translate and rotate observations 
 		for(vector<LandmarkObs>::iterator itO = observations.begin(); itO != observations.end(); itO++) {
-			double x = itP->x + itP->x * cos(itP->theta) - itP->y * sin(itP->theta);
-			double y = itP->y + itP->y * sin(itP->theta) + itP->x * cos(itP->theta);
+			double x = itP->x + itO->x * cos(itP->theta) - itO->y * sin(itP->theta);
+			double y = itP->y + itO->x * sin(itP->theta) + itO->y * cos(itP->theta);
 			LandmarkObs transformed_observation = {itO->id, x, y};
 			transformed_observations.push_back(transformed_observation);
 		}
