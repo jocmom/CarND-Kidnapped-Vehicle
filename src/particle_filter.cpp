@@ -73,16 +73,14 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   implement this method and use it as a helper during the updateWeights phase.
 	for(int i=0; i<observations.size(); ++i) {
 		double closestPrediction = __DBL_MAX__;
-		int closestIndex=0;
 		for(int j=0; j<predicted.size(); ++j) {
 			double distance = dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y);
 			if(distance < closestPrediction) {
 				closestPrediction = distance;
-				//observations[i].id = j;
-				closestIndex = j;
+				// observations[i].id = predicted[j].id;
+				observations[i].id = j;
 			}
 		}
-		observations[i].id = closestIndex;
 	}
 }
 
@@ -127,6 +125,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				valid_landmarks.push_back(valid_landmark);
 			}
 		}
+		if(valid_landmarks.size() == 0) {
+			continue;
+		}
 		// Association
 		this->dataAssociation(valid_landmarks, transformed_observations);
 
@@ -151,14 +152,12 @@ void ParticleFilter::resample() {
 	default_random_engine gen;
 	discrete_distribution<int> dist_w(this->weights.begin(), this->weights.end());
 	vector<Particle> updated_particles;
-
-	for(int i=0; i<num_particles; ++i) {
-		int idx = dist_w(gen);
-// TODO use init weight?
-		Particle p = {i, particles[idx].x, particles[idx].y, particles[idx].theta, 1.};
-// TODO this->weights update?
-		updated_particles.push_back(p);
+	updated_particles.resize(num_particles);
+    
+	for(int i=0; i<num_particles; i++) {
+		updated_particles[i] = this->particles[dist_w(gen)];
 	}
+	this->particles = updated_particles;
 }
 
 void ParticleFilter::write(std::string filename) {
