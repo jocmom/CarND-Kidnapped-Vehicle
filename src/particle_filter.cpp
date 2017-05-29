@@ -50,18 +50,17 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	normal_distribution<double> dist_y(0., std_pos[1]);
 	normal_distribution<double> dist_theta(0., std_pos[2]);
 
-
-    for(auto it = particles.begin(); it != particles.end(); ++it) {
+    for(auto& p:particles) {
 		if(is_moving_straight) {
-			it->x += delta_pos * cos(it->theta) + dist_x(gen);
-			it->y += delta_pos * sin(it->theta) + dist_y(gen);
-			it->theta += dist_theta(gen);
+			p.x += delta_pos * cos(p.theta) + dist_x(gen);
+			p.y += delta_pos * sin(p.theta) + dist_y(gen);
+			p.theta += dist_theta(gen);
 		} 
 		else {
-			const double phi = it->theta + delta_theta;
-			it->x += f * (sin(phi) - sin(it->theta)) + dist_x(gen); 
-			it->y += f * (cos(it->theta) - cos(phi)) + dist_y(gen);
-			it->theta = phi + dist_theta(gen);
+			const double phi = p.theta + delta_theta;
+			p.x += f * (sin(phi) - sin(p.theta)) + dist_x(gen); 
+			p.y += f * (cos(p.theta) - cos(phi)) + dist_y(gen);
+			p.theta = phi + dist_theta(gen);
 		}
 	}
 }
@@ -71,15 +70,16 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
-	for(int i=0; i<observations.size(); ++i) {
+    for(auto& o:observations) {
 		double closestPrediction = __DBL_MAX__;
-		for(int j=0; j<predicted.size(); ++j) {
-			double distance = dist(predicted[j].x, predicted[j].y, observations[i].x, observations[i].y);
+		int idx = 0;
+		for(const auto& p:predicted) {
+			double distance = dist(p.x, p.y, o.x, o.y);
 			if(distance < closestPrediction) {
 				closestPrediction = distance;
-				// observations[i].id = predicted[j].id;
-				observations[i].id = j;
+				o.id = idx;
 			}
+			idx++;
 		}
 	}
 }
@@ -103,25 +103,23 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	const double std_x_square = 0.5/(std_x*std_x);
 	const double std_y_square = 0.5/(std_y*std_y);
 	const double d = 2.*M_PI*std_x*std_y;
+	int idx = 0;
 
 	// Transformation from vehicle to map coordinate system for each particle
-	for(vector<Particle>::iterator itP = particles.begin(); itP != particles.end(); ++itP) {
+	for(auto& p:particles) {
 		vector<LandmarkObs> valid_landmarks;
 		vector<LandmarkObs> transformed_observations;
 		// translate and rotate observations 
-		for(vector<LandmarkObs>::iterator itO = observations.begin(); itO != observations.end(); itO++) {
-			double x = itP->x + itO->x * cos(itP->theta) - itO->y * sin(itP->theta);
-			double y = itP->y + itO->x * sin(itP->theta) + itO->y * cos(itP->theta);
-			LandmarkObs transformed_observation = {itO->id, x, y};
+		for(const auto& o:observations) {
+			double x = p.x + o.x * cos(p.theta) - o.y * sin(p.theta);
+			double y = p.y + o.x * sin(p.theta) + o.y * cos(p.theta);
+			LandmarkObs transformed_observation = {o.id, x, y};
 			transformed_observations.push_back(transformed_observation);
 		}
 		// select only valid landmarks in sensor range
-		for(vector<Map::single_landmark_s>::iterator itL = map_landmarks.landmark_list.begin(); 
-			itL != map_landmarks.landmark_list.end();
-			++ itL) 
-		{
-			if(dist(itP->x, itP->y, itL->x_f, itL->y_f) <= sensor_range) {
-				LandmarkObs valid_landmark = {itL->id_i, itL->x_f, itL->y_f};
+		for(const auto& l:map_landmarks.landmark_list) {
+			if(dist(p.x, p.y, l.x_f, l.y_f) <= sensor_range) {
+				LandmarkObs valid_landmark = {l.id_i, l.x_f, l.y_f};
 				valid_landmarks.push_back(valid_landmark);
 			}
 		}
@@ -133,15 +131,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		// calculate particle weights
 		double weight = 1.;
-		for(vector<LandmarkObs>::iterator itO = transformed_observations.begin(); itO != transformed_observations.end(); itO++) {
-			double diff_x = itO->x - valid_landmarks[itO->id].x;
-			double diff_y = itO->y - valid_landmarks[itO->id].y;
+		for(const auto& o:transformed_observations) {
+			double diff_x = o.x - valid_landmarks[o.id].x;
+			double diff_y = o.y - valid_landmarks[o.id].y;
 			double diff_x_square = diff_x * diff_x;
 			double diff_y_square = diff_y * diff_y;
 			weight *= exp(-(diff_x_square*std_x_square + diff_y_square*std_y_square )) / d;
 		}
-		itP->weight = weight;
-		this->weights[itP - particles.begin()] = weight;
+		p.weight = weight;
+		this->weights[idx++] = weight;
 	}
 }
 
@@ -153,9 +151,9 @@ void ParticleFilter::resample() {
 	discrete_distribution<int> dist_w(this->weights.begin(), this->weights.end());
 	vector<Particle> updated_particles;
 	updated_particles.resize(num_particles);
-    
-	for(int i=0; i<num_particles; i++) {
-		updated_particles[i] = this->particles[dist_w(gen)];
+
+	for(auto& p:updated_particles) {
+		p = this->particles[dist_w(gen)]; 
 	}
 	this->particles = updated_particles;
 }
