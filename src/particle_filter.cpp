@@ -9,10 +9,17 @@
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+#include <math.h> 
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <iterator>
 
 #include "particle_filter.h"
 #include "helper_functions.h"
 #include "map.h"
+
+using namespace std;
 
 using namespace std;
 
@@ -94,8 +101,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   The following is a good resource for the theory:
 	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
 	//   and the following is a good resource for the actual equation to implement (look at equation 
-	//   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
-	//   for the fact that the map's y-axis actually points downwards.)
+	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
 	const double std_x = std_landmark[0];
@@ -158,12 +164,49 @@ void ParticleFilter::resample() {
 	this->particles = updated_particles;
 }
 
-void ParticleFilter::write(std::string filename) {
-	// You don't need to modify this file.
-	std::ofstream dataFile;
-	dataFile.open(filename, std::ios::app);
-	for (int i = 0; i < num_particles; ++i) {
-		dataFile << particles[i].x << " " << particles[i].y << " " << particles[i].theta << "\n";
-	}
-	dataFile.close();
+Particle ParticleFilter::SetAssociations(Particle particle, std::vector<int> associations, std::vector<double> sense_x, std::vector<double> sense_y)
+{
+	//particle: the particle to assign each listed association, and association's (x,y) world coordinates mapping to
+	// associations: The landmark id that goes along with each listed association
+	// sense_x: the associations x mapping already converted to world coordinates
+	// sense_y: the associations y mapping already converted to world coordinates
+
+	//Clear the previous associations
+	particle.associations.clear();
+	particle.sense_x.clear();
+	particle.sense_y.clear();
+
+	particle.associations= associations;
+ 	particle.sense_x = sense_x;
+ 	particle.sense_y = sense_y;
+
+ 	return particle;
+}
+
+string ParticleFilter::getAssociations(Particle best)
+{
+	vector<int> v = best.associations;
+	stringstream ss;
+    copy( v.begin(), v.end(), ostream_iterator<int>(ss, " "));
+    string s = ss.str();
+    s = s.substr(0, s.length()-1);  // get rid of the trailing space
+    return s;
+}
+string ParticleFilter::getSenseX(Particle best)
+{
+	vector<double> v = best.sense_x;
+	stringstream ss;
+    copy( v.begin(), v.end(), ostream_iterator<float>(ss, " "));
+    string s = ss.str();
+    s = s.substr(0, s.length()-1);  // get rid of the trailing space
+    return s;
+}
+string ParticleFilter::getSenseY(Particle best)
+{
+	vector<double> v = best.sense_y;
+	stringstream ss;
+    copy( v.begin(), v.end(), ostream_iterator<float>(ss, " "));
+    string s = ss.str();
+    s = s.substr(0, s.length()-1);  // get rid of the trailing space
+    return s;
 }
